@@ -1,0 +1,18 @@
+{
+  "InstitutionAddress": "Westmead Innovation Quarter Building U, Level 4/160 Hawkesbury Rd, Westmead NSW 2145 Australia",
+  "InstitutionName": "Western Sydney University",
+  "InstitutionalDepartmentName": "The MARCS Institute for Brain, Behaviour and Development",
+  "PowerLineFrequency": 50,
+  "ManufacturersModelName": "ActiveTwo",
+  "TaskName": "task-targets",
+  "EEGReference": "CMS/DRL",
+  "Manufacturer": "BIOSEMI",
+  "EEGChannelCount": 64,
+  "MiscChannelCount": 0,
+  "RecordingType": "continuous",
+  "SamplingFrequency": 2048,
+  "EOGChannelCount": 0,
+  "ECGChannelCount": 0,
+  "EMGChannelCount": 0,
+  "SoftwareFilters": "n/a"
+}
