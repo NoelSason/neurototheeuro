@@ -1,6 +1,6 @@
-# Results — contrast: balanced_primary
+# Results — contrast: presence
 
-**Verdict:** On 'balanced_primary' (n=4 held-out subjects): SSL-pretrained Model B does NOT outperform the single-subject baseline at the 25% budget (median Δbalanced-acc=-0.486, Wilcoxon p=1, not significant at α=0.05). Data-efficiency: ~1.0x less target data to match the from-scratch EEGNet baseline. [PROVISIONAL contrast — semantics pending the ds005273 paper]
+**Verdict:** On 'presence' (n=4 held-out subjects): SSL-pretrained Model B does NOT outperform the single-subject baseline at the 25% budget (median Δbalanced-acc=-0.486, Wilcoxon p=1, not significant at α=0.05). Data-efficiency: ~1.0x less target data to match the from-scratch EEGNet baseline.
 
 ## T1 — Data-efficiency curve (headline)
 
@@ -28,7 +28,7 @@
 
 | subject | contrast | provisional | n_valid | class_counts | pos_frac |
 | --- | --- | --- | --- | --- | --- |
-| sub-s00 | balanced_primary | True | 120 | {0: 64, 1: 56} | 0.467 |
-| sub-s01 | balanced_primary | True | 120 | {1: 61, 0: 59} | 0.508 |
-| sub-s02 | balanced_primary | True | 120 | {1: 66, 0: 54} | 0.55 |
-| sub-s03 | balanced_primary | True | 120 | {0: 68, 1: 52} | 0.433 |
+| sub-s00 | presence | False | 120 | {0: 64, 1: 56} | 0.467 |
+| sub-s01 | presence | False | 120 | {1: 61, 0: 59} | 0.508 |
+| sub-s02 | presence | False | 120 | {1: 66, 0: 54} | 0.55 |
+| sub-s03 | presence | False | 120 | {0: 68, 1: 52} | 0.433 |

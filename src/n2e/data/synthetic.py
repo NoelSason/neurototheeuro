@@ -84,11 +84,14 @@ def make_synthetic_subject(
             amp = effect_uv if label == 1 else -effect_uv
             for ci in post_idx:
                 data[ci, start:stop] += amp * erp
-        anchor_code = 71 if label == 1 else 70
-        class_code = 75 if label == 1 else 74
+        anchor_code = 71 if label == 1 else 70    # present vs absent (primary contrast)
+        class_code = 75 if label == 1 else 74      # orientation-family marker
         rows.append((base + 0.5, "Stimulus/S 6"))
         rows.append((anchor_on, f"Stimulus/S {anchor_code}"))
         rows.append((anchor_on + 0.3, f"Stimulus/S {class_code}"))
+        # present trials: emit a "seen" response marker on ~half (non-degenerate seen_unseen)
+        if label == 1 and rng.random() < 0.5:
+            rows.append((anchor_on + 0.5, "Stimulus/S 59"))
         rows.append((anchor_on + 0.8, "Stimulus/S 1"))
 
     events = pd.DataFrame(rows, columns=["onset", "trial_type"])

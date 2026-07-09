@@ -13,7 +13,7 @@ def _agg(deltas, budget=25):
     for i, d in enumerate(deltas):
         subj = f"sub-{i:02d}"
         common = dict(
-            dataset="x", contrast="balanced_primary", study_pool_size="full",
+            dataset="x", contrast="presence", study_pool_size="full",
             target_budget_pct=budget, metric="balanced_accuracy", hidden_subject=subj,
         )
         rows.append({**common, "model": "A2_eegnet", "adaptation": "from_scratch", "value": 0.5})

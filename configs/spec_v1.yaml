@@ -84,8 +84,8 @@ decode:
     batch_size: 64
 
 experiment:
-  contrasts: [balanced_primary, seen_unseen]
-  primary_contrast: balanced_primary   # de-risk on the cleanest balanced contrast first
+  contrasts: [presence, seen_unseen]
+  primary_contrast: presence            # de-risk on the paper-confirmed present/absent contrast first
   loso: true                            # rotating leave-one-subject-out over decodable subjects
   target_test_frac: 0.30                # fixed stratified held-out test (same across budgets)
   budgets_pct: [5, 10, 25, 50, 100]     # target label budget from the other 70%, matched A<->B
@@ -97,7 +97,7 @@ stats:
   unit: subject              # average seeds -> one value per subject before testing
   primary:                   # pre-registered confirmatory endpoint (single test)
     metric: balanced_accuracy
-    contrast: balanced_primary
+    contrast: presence
     budget_pct: 25
     comparison: [B_ssl_finetune, A2_eegnet]
     test: wilcoxon_signed_rank

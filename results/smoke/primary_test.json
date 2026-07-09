@@ -1,5 +1,5 @@
 {
-  "endpoint": "balanced_accuracy | balanced_primary | budget 25% | B_ssl(finetune) vs A2_eegnet",
+  "endpoint": "balanced_accuracy | presence | budget 25% | B_ssl(finetune) vs A2_eegnet",
   "test": "wilcoxon_signed_rank",
   "alternative": "greater",
   "n_subjects": 4,

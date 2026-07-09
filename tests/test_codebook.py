@@ -34,10 +34,19 @@ def test_value_column_is_not_the_scode():
     assert codebook.parse_scode(row["trial_type"]) == 70
 
 
-def test_assign_trials_balanced_primary_produces_two_classes():
+def test_presence_contrast_matches_paper_ratio():
     df = codebook.read_events(EVENTS)
-    trials = codebook.assign_trials(df, codebook.CONTRASTS["balanced_primary"])
+    trials = codebook.assign_trials(df, codebook.CONTRASTS["presence"])
     rep = codebook.balance_report(trials)
-    assert rep["n_valid"] > 0
-    assert set(rep["class_counts"]).issubset({0, 1})
-    assert 0.2 < rep["pos_frac"] < 0.8  # de-risk contrast is reasonably balanced
+    assert rep["n_valid"] == 898  # 600 present (S71) + 298 absent (S70)
+    assert rep["class_counts"] == {1: 600, 0: 298}
+    assert abs(rep["pos_frac"] - 600 / 898) < 1e-6  # ~0.668 present (paper: 66.7%)
+
+
+def test_seen_unseen_anchors_on_present_trials_only():
+    df = codebook.read_events(EVENTS)
+    trials = codebook.assign_trials(df, codebook.CONTRASTS["seen_unseen"])
+    rep = codebook.balance_report(trials)
+    assert rep["n_valid"] == 600  # only present trials are eligible
+    assert set(rep["class_counts"]) == {0, 1}  # both seen and unseen present
+    assert 0.1 < rep["pos_frac"] < 0.6  # minority reported seen (near-threshold)

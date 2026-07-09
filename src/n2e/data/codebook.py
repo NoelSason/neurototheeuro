@@ -5,21 +5,33 @@ CRITICAL correctness rule
 The trigger code lives in the ``trial_type`` string as ``"Stimulus/S NN"``.
 The ``value`` column is a **per-file dense remap** (e.g. in sub-10 ``value 2`` == S1,
 ``value 16`` == S70) and is **NOT comparable across subjects**. Never derive labels
-from ``value``. :func:`read_events` parses ``trial_type`` and drops ``value`` to
-prevent accidental downstream use.
+from ``value``. :func:`read_events` parses ``trial_type`` and drops ``value``.
 
-Observed S-code frequencies (sub-10, 9,310 events, ~897 trials)
---------------------------------------------------------------
-Structural (≈1 per trial): S1 897, S4 897, S5 897, S6 898, S7 898, S10 897.
-"50s" family: S50 521, S51 77, S55 445, S56 293, S57 7, S58 1, S59 152, S63 32.
-"70s" family: S70 298, S71 600, S74 299, S75 299, S76 598, S77 300.
+Paradigm (recovered from the paper — codebook is NOT in the OpenNeuro repo)
+--------------------------------------------------------------------------
+Rodríguez-San Esteban, González-López, Chica, *Scientific Reports* 2025 (PMC11885812):
+Gabor **orientation discrimination** (clockwise/counter, keys k/m) + a **binary
+seen/unseen visibility report** (keys d/c) collected on *every* trial. Target
+**present on 66.7%** of trials, **absent on 33.3%** (40/20 per 60-trial block; 600
+experimental trials, plus localizer blocks → ~900 total markers/subject). Stimulus
+50 ms, mask at +300 ms. Decodable per the paper: **stimulus presence/absence** and
+**subjective awareness (seen/unseen)**; **orientation was NOT decodable**.
 
-Notes for whoever holds the paper codebook:
-- ``S70 + S71 = 898`` (exactly one per trial) → a clean binary condition, 1:2 split.
-- ``S74 + S75 + S77 = 898`` (≈299 each) → a balanced 3-way condition.
-- The seen/unseen semantics are UNKNOWN here and must be confirmed from the ds005273
-  publication. Until then both contrasts below are marked ``provisional=True`` and
-  every result row / Table 4 carries that flag. TODO(paper): fill the real mapping.
+Trigger interpretation (from the paper's proportions + a marker contingency analysis
+of sub-10; see git history / codebook notes)
+- **Presence (CONFIRMED by the 67/33 ratio):** ``S71`` = present (600), ``S70`` = absent (298).
+- Stimulus-locked balanced 3-way ``S74/S75/S77`` (~299 each, ~1/3 within *both* present
+  and absent) = an unknown experimental factor (cue/contrast/SOA); ``S76`` = a 2/3 marker.
+  These are NOT orientation (they occur on absent trials too).
+- Response-family (~1.8 s post-stimulus): ``S59`` (present 151, absent 1) and ``S51``
+  (present 77, absent 0) are **present-exclusive** → "seen/aware" candidates, but
+  ambiguous with "orientation-correct" (also present-only). ``S50/S55/S56`` occur on
+  both present and absent trials. TODO(confirm): disambiguate seen vs orientation-correct
+  from the two-response temporal order once signals are fetched, or from the authors' script.
+
+Observed S-code frequencies (sub-10): S1/4/5/6/7/10 ≈ 897 (structural, 1/trial);
+S50 521, S51 77, S55 445, S56 293, S57 7, S58 1, S59 152, S63 32;
+S70 298, S71 600, S74 299, S75 299, S76 598, S77 300.
 """
 from __future__ import annotations
 
@@ -59,18 +71,26 @@ def scode_frequencies(events: pd.DataFrame) -> dict[int, int]:
 
 @dataclass(frozen=True)
 class Contrast:
-    """A binary (or n-ary) decoding contrast defined over trigger codes.
+    """A decoding contrast defined over trigger codes.
 
-    - ``anchor_codes``: stimulus-onset codes to time-lock epochs on (one per trial).
-    - ``class_codes``: ordered mapping ``{class_name: (codes,)}``; label index = order.
-      A trial is assigned a class if exactly one class's codes appear in its window
-      ``[anchor, next_anchor)``; otherwise it is invalid (dropped).
-    - ``provisional``: True until the code→semantics mapping is confirmed from the paper.
+    - ``anchor_codes``: codes that mark an *eligible* trial for this contrast (the epoch
+      is time-locked to the anchor). e.g. presence anchors on {70,71}; seen/unseen anchors
+      only on present trials {71}.
+    - ``boundary_codes``: codes that delimit trials (default = ``anchor_codes``). A trial's
+      code window is ``[boundary, next_boundary)``. Set wider than ``anchor_codes`` when
+      eligible trials are a subset (so windows aren't stretched across skipped trials).
+    - ``class_codes``: ordered ``{class_name: (codes,)}``; label index = order. A trial is
+      labelled by the single class whose codes appear in its window.
+    - ``default_label``: label for an eligible trial whose window matches *no* class code
+      (e.g. "unseen" = a present trial with no seen marker). ``None`` -> drop such trials.
+    - ``provisional``: True until the code→semantics mapping is confirmed from paper/script.
     """
 
     name: str
     anchor_codes: tuple[int, ...]
     class_codes: dict[str, tuple[int, ...]]
+    boundary_codes: Optional[tuple[int, ...]] = None
+    default_label: Optional[int] = None
     provisional: bool = True
     note: str = ""
 
@@ -80,38 +100,40 @@ class Contrast:
 
 
 CONTRASTS: dict[str, Contrast] = {
-    # De-risk contrast: maximally balanced, reliably-coded. 74 vs 75 are ~equal
-    # frequency (299 vs 299 in sub-10). Semantics pending paper.
-    "balanced_primary": Contrast(
-        name="balanced_primary",
+    # Primary de-risk contrast: stimulus present vs absent. Confirmed — the 600/298
+    # split is exactly the paper's 66.7%/33.3% present/absent ratio. 2:1 imbalanced;
+    # balanced-accuracy + AUC handle it, and budget draws are class-stratified.
+    "presence": Contrast(
+        name="presence",
         anchor_codes=(70, 71),
-        class_codes={"cond_A": (74,), "cond_B": (75,)},
-        provisional=True,
-        note=(
-            "PROVISIONAL: S74 vs S75 chosen for near-equal frequency (299/299). "
-            "Class semantics unknown pending the ds005273 codebook."
-        ),
+        class_codes={"absent": (70,), "present": (71,)},
+        provisional=False,
+        note="CONFIRMED: S71=present (66.7%), S70=absent (33.3%) — matches the paper.",
     ),
-    # Headline contrast (reported second). Placeholder mapping — DO NOT report as a
-    # scientific seen/unseen result until confirmed from the paper.
+    # Headline contrast: subjective awareness on present trials. PROVISIONAL — the
+    # present-exclusive response codes are seen/aware candidates but ambiguous with
+    # orientation-correct. Every result carries the provisional flag until confirmed.
     "seen_unseen": Contrast(
         name="seen_unseen",
-        anchor_codes=(70, 71),
-        class_codes={"class0": (70,), "class1": (71,)},
+        anchor_codes=(71,),            # present trials only
+        boundary_codes=(70, 71),       # but bound windows by all trial starts
+        class_codes={"unseen": (), "seen": (51, 57, 58, 59)},
+        default_label=0,               # present trial with no "seen" marker -> unseen
         provisional=True,
         note=(
-            "PROVISIONAL/STUB: S70 vs S71 placeholder (298/600). The true seen/unseen "
-            "mapping MUST be confirmed from the paper. TODO(paper)."
+            "PROVISIONAL: 'seen' = present trial carrying a present-exclusive response "
+            "code {51,57,58,59}; 'unseen' = present trial without one. These codes are "
+            "ambiguous with orientation-correct — confirm before reporting. TODO(paper/script)."
         ),
     ),
 }
 
 
 def assign_trials(events: pd.DataFrame, contrast: Contrast) -> pd.DataFrame:
-    """Segment events into trials and assign each a class label for ``contrast``.
+    """Segment events into trials and assign each eligible trial a class label.
 
     Returns a DataFrame with columns ``onset`` (s), ``sample`` (orig sfreq),
-    ``anchor_scode``, ``label`` (0-based; -1 = invalid), ``valid``.
+    ``anchor_scode``, ``label`` (0-based; -1 = invalid/dropped), ``valid``.
     """
     ev = events.copy()
     if "scode" not in ev.columns:  # synthetic / raw events -> derive from trial_type
@@ -120,10 +142,12 @@ def assign_trials(events: pd.DataFrame, contrast: Contrast) -> pd.DataFrame:
     ev["scode"] = ev["scode"].astype(int)
     ev = ev.sort_values("onset").reset_index(drop=True)
 
-    anchors = ev[ev["scode"].isin(contrast.anchor_codes)].reset_index(drop=True)
-    onsets = anchors["onset"].to_numpy(dtype=float)
-    samples = anchors["sample"].to_numpy() if "sample" in anchors else np.zeros(len(anchors))
-    next_onset = np.append(onsets[1:], np.inf) if len(onsets) else onsets
+    boundary_codes = contrast.boundary_codes or contrast.anchor_codes
+    bnd = ev[ev["scode"].isin(boundary_codes)].reset_index(drop=True)
+    b_onset = bnd["onset"].to_numpy(dtype=float)
+    b_sample = bnd["sample"].to_numpy() if "sample" in bnd else np.zeros(len(bnd))
+    b_code = bnd["scode"].to_numpy()
+    next_onset = np.append(b_onset[1:], np.inf) if len(b_onset) else b_onset
 
     code_to_label: dict[int, int] = {}
     for label, cname in enumerate(contrast.class_names):
@@ -132,19 +156,29 @@ def assign_trials(events: pd.DataFrame, contrast: Contrast) -> pd.DataFrame:
 
     ev_onsets = ev["onset"].to_numpy(dtype=float)
     ev_codes = ev["scode"].to_numpy()
-    labels = np.full(len(anchors), -1, dtype=int)
-    for i in range(len(anchors)):
-        window = (ev_onsets >= onsets[i]) & (ev_onsets < next_onset[i])
+    onsets, samples, anchors, labels = [], [], [], []
+    for i in range(len(bnd)):
+        if b_code[i] not in contrast.anchor_codes:  # trial not eligible for this contrast
+            continue
+        window = (ev_onsets >= b_onset[i]) & (ev_onsets < next_onset[i])
         present = {code_to_label[c] for c in ev_codes[window].tolist() if c in code_to_label}
         if len(present) == 1:
-            labels[i] = present.pop()
+            label = present.pop()
+        elif len(present) == 0 and contrast.default_label is not None:
+            label = contrast.default_label
+        else:
+            label = -1  # ambiguous (>1 class) or unmatched with no default
+        onsets.append(b_onset[i])
+        samples.append(int(b_sample[i]))
+        anchors.append(int(b_code[i]))
+        labels.append(label)
 
     out = pd.DataFrame(
         {
-            "onset": onsets,
-            "sample": np.asarray(samples).astype(int),
-            "anchor_scode": anchors["scode"].to_numpy() if len(anchors) else np.array([], int),
-            "label": labels,
+            "onset": np.asarray(onsets, dtype=float),
+            "sample": np.asarray(samples, dtype=int),
+            "anchor_scode": np.asarray(anchors, dtype=int),
+            "label": np.asarray(labels, dtype=int),
         }
     )
     out["valid"] = out["label"] >= 0
