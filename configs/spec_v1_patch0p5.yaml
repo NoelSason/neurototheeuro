@@ -1,0 +1,6 @@
+# Pre-registered patch-length sensitivity rerun (0.5 s instead of 1.0 s).
+# Everything else inherits spec_v1.yaml.
+_base: spec_v1.yaml
+tokenizer:
+  patch_s: 0.5
+  patch_stride_s: 0.5

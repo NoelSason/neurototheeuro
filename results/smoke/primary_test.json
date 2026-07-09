@@ -1,0 +1,24 @@
+{
+  "endpoint": "balanced_accuracy | balanced_primary | budget 25% | B_ssl(finetune) vs A2_eegnet",
+  "test": "wilcoxon_signed_rank",
+  "alternative": "greater",
+  "n_subjects": 4,
+  "median_A2_eegnet": 1.0,
+  "median_B_ssl": 0.5138888888888888,
+  "median_delta": -0.4861111111111111,
+  "mean_delta": -0.4774305555555556,
+  "wilcoxon_stat": 0.0,
+  "p_value": 1.0,
+  "alpha": 0.05,
+  "significant": false,
+  "rank_biserial": -1.0,
+  "mean_delta_ci95": [
+    -0.5,
+    -0.453125
+  ],
+  "data_efficiency": {
+    "reference_A2_full": 1.0,
+    "crossover_budget_pct": 100,
+    "data_efficiency_factor": 1.0
+  }
+}

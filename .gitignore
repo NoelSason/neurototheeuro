@@ -1,1 +1,29 @@
 .DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Fetched raw EEG signal binaries (BrainVision triplet) — never commit
+*.eeg
+*.vhdr
+*.vmrk
+
+# Data caches & fetched datasets (large; reproducible from configs).
+# Anchored to repo root so the src/n2e/data source package is NOT ignored.
+/data/
+/cache/
+
+# Model checkpoints (large)
+/checkpoints/
+*.pt
+*.ckpt
+
+# Scratch
+scratch/
+*.log

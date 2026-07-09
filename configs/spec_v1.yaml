@@ -1,0 +1,110 @@
+# neurototheeuro — Frozen v1 spec (single source of truth).
+# Every number here is fixed by the architect plan
+# (~/.claude/plans/done-and-this-magical-quail.md, Appendix A-C).
+# No magic numbers live in code; code reads this file.
+spec_version: v1
+seeds: [0, 1, 2, 3, 4]        # >=5 seeds; aggregated per-subject before the paired test
+
+data:
+  dataset: ds005273
+  sfreq_orig: 1000.0
+  sfreq: 250.0                # resample target
+  line_freq: 50.0            # notch (EU Brain Products rig)
+  bandpass: [0.1, 40.0]      # zero-phase FIR
+  reference: car             # common-average over the 60 scalp channels
+  robust_z: true             # per-channel (median, IQR/1.349) over the recording
+  # Of 63 labeled-EEG channels: EOG1/EOG2 are ocular, FCz is the (flat) online
+  # reference. All three have n/a CapTrak coords -> excluded from the encoder.
+  drop_channels: [EOG1, EOG2, FCz]
+  n_scalp_channels: 60
+  epoch_reject_ptp_uv: 150.0 # drop epoch if any scalp ch peak-to-peak > this (µV)
+  # windows
+  ssl_crop_s: 8.0            # non-overlapping continuous crops -> 8 patches @1.0s
+  ssl_crop_overlap: 0.0
+  decode_tmin: -0.2          # trial epoch around onset marker (s)
+  decode_tmax: 1.0
+  decode_baseline: [-0.2, 0.0]
+  # sub-17 has no events.tsv -> SSL-pretraining only, never a decode target/test.
+  ssl_only_subjects: [sub-17]
+
+tokenizer:
+  patch_s: 1.0               # DEFAULT (250 samples @250Hz). patch0p5 override -> 0.5
+  patch_stride_s: 1.0        # non-overlapping
+  d_model: 256
+  coord_fourier_bands: 16    # 3D CapTrak coord -> Fourier features -> MLP (portable)
+  use_channel_id: true       # learned per-channel emb (non-portable; drop cross-montage)
+  temporal_pos: sinusoid
+
+encoder:
+  depth: 6
+  d_model: 256
+  n_heads: 8
+  mlp_ratio: 4
+  dropout: 0.1
+  attn_dropout: 0.1
+  pool: mean                 # mean | cls
+
+ssl:
+  objective: masked_patch_recon
+  mask_ratio: 0.5            # ablation grid [0.3, 0.5, 0.75]
+  mask_scheme: random        # random | channel | timepatch
+  decoder_hidden: 256
+  loss: mse                  # on masked patches only (normalized µV). latent-pred = v2
+  optim:
+    name: adamw
+    lr: 3.0e-4
+    betas: [0.9, 0.95]
+    weight_decay: 0.05
+    warmup_frac: 0.1
+    grad_clip: 1.0
+    batch_size: 256
+    epochs: 100
+
+decode:
+  # head identical across A1 and B: mean-pool encoder tokens -> Linear(d, n_classes)
+  finetune:                  # B (SSL) headline adaptation; also A1 (random init)
+    encoder_lr: 1.0e-4
+    head_lr: 1.0e-3
+    epochs: 50
+    batch_size: 64
+    weight_decay: 0.01
+    early_stop_patience: 8
+  linear_probe:              # B representation read (frozen encoder)
+    lr: 1.0e-3
+    epochs: 100
+    batch_size: 64
+  eegnet:                    # A2 field-standard single-subject baseline
+    F1: 8
+    D: 2
+    F2: 16
+    kernel_s: 0.5            # temporal kernel ~0.5s @250Hz -> 125 samples
+    dropout: 0.25
+    epochs: 100
+    lr: 1.0e-3
+    batch_size: 64
+
+experiment:
+  contrasts: [balanced_primary, seen_unseen]
+  primary_contrast: balanced_primary   # de-risk on the cleanest balanced contrast first
+  loso: true                            # rotating leave-one-subject-out over decodable subjects
+  target_test_frac: 0.30                # fixed stratified held-out test (same across budgets)
+  budgets_pct: [5, 10, 25, 50, 100]     # target label budget from the other 70%, matched A<->B
+  primary_budget_pct: 25
+  breadth_pool_sizes: [1, 4, 14, 28]    # secondary ablation: B pretraining-pool size
+  models: [A1_matched, A2_eegnet, B_ssl, Xsub_sup]
+
+stats:
+  unit: subject              # average seeds -> one value per subject before testing
+  primary:                   # pre-registered confirmatory endpoint (single test)
+    metric: balanced_accuracy
+    contrast: balanced_primary
+    budget_pct: 25
+    comparison: [B_ssl_finetune, A2_eegnet]
+    test: wilcoxon_signed_rank
+    alpha: 0.05
+    alternative: greater     # one-sided B > A
+  secondary_correction: holm # across the budget family; exploratory
+  effect_size: [rank_biserial, bootstrap_ci]
+  bootstrap_n: 10000
+  permutation_n: 200         # label-shuffle chance check (~0.5 balanced accuracy)
+  metrics: [balanced_accuracy, auc, accuracy, f1_macro]

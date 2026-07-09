@@ -1,0 +1,42 @@
+# Smoke profile: exercises the ENTIRE pipeline at tiny scale to prove plumbing +
+# output schema, NOT science. Inherits spec_v1.yaml. Runs on CPU in seconds.
+_base: spec_v1.yaml
+seeds: [0]
+
+data:
+  sfreq: 250.0
+
+tokenizer:
+  d_model: 32
+
+encoder:
+  depth: 2
+  d_model: 32
+  n_heads: 4
+  mlp_ratio: 2
+
+ssl:
+  mask_ratio: 0.5
+  decoder_hidden: 32
+  optim:
+    batch_size: 16
+    epochs: 8
+
+# Modest epochs: still seconds-to-minutes on CPU, but enough that the transformer
+# clears chance so the committed artifact self-evidently exercises every model.
+decode:
+  finetune: {epochs: 25, batch_size: 16, encoder_lr: 5.0e-4, head_lr: 1.0e-3}
+  linear_probe: {epochs: 40, batch_size: 16}
+  eegnet: {epochs: 25, batch_size: 16}
+
+experiment:
+  target_test_frac: 0.30
+  budgets_pct: [25, 100]
+  primary_budget_pct: 25
+  breadth_pool_sizes: [1]
+  models: [A1_matched, A2_eegnet, B_ssl, Xsub_sup]
+
+stats:
+  primary: {budget_pct: 25}
+  bootstrap_n: 200
+  permutation_n: 20

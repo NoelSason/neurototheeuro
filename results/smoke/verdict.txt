@@ -1,0 +1,1 @@
+On 'balanced_primary' (n=4 held-out subjects): SSL-pretrained Model B does NOT outperform the single-subject baseline at the 25% budget (median Δbalanced-acc=-0.486, Wilcoxon p=1, not significant at α=0.05). Data-efficiency: ~1.0x less target data to match the from-scratch EEGNet baseline. [PROVISIONAL contrast — semantics pending the ds005273 paper]
